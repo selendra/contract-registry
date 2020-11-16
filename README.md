@@ -19,7 +19,7 @@ TODO
 
 TODO
 
-#### Install with Packman/Pix (Archlinux/KOOMPI OS)
+#### Install with Pacman/Pix (Archlinux/KOOMPI OS)
 
 TODO
 
