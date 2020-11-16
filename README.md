@@ -19,11 +19,19 @@ TODO
 
 TODO
 
-#### Install with Pacman/Pix on Archlinux/KOOMPI OS
+#### Install with Pacman on Archlinux
+
+TODO 
+
+#### Install with Pix on KOOMPI OS
 
 TODO
 
-#### Install with Snap on Debian/Ubuntu
+#### Install with apt on Debian
+
+TODO
+
+#### Install with Snap on Ubuntu
 
 TODO
 
