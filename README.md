@@ -19,12 +19,16 @@ TODO
 
 TODO
 
-#### Install On Snap
+#### Install with Packman/Pix (Archlinux/KOOMPI OS)
+
+TODO
+
+#### Install with Snap on Debian/Ubuntu
 
 TODO
 
 
-#### Install MacOS
+#### Install on MacOS
 
 TODO
 
