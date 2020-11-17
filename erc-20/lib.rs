@@ -18,7 +18,7 @@ mod erc20 {
 
     #[ink(storage)]
     pub struct Erc20 {
-        /// Total token supply.
+        /// Total token supply .
         total_supply: Lazy<Balance>,
         /// Mapping from owner to number of owned token.
         balances: StorageHashMap<AccountId, Balance>,
