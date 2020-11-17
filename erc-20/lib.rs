@@ -12,8 +12,6 @@ mod erc20 {
     pub enum Error {
         InsufficientBalance,
         InsufficientAllowance,
-        OnlyOwner,
-        EvilAccount,
     }
 
     pub type Result<T> = core::result::Result<T, Error>;
