@@ -38,15 +38,6 @@ mod erc20 {
         value: Balance,
     }
 
-    ///Event emitted when ownership have transfer
-    #[ink(event)]
-    pub struct TransferOwnerShip {
-        #[ink(topic)]
-        from: AccountId,
-        #[ink(topic)]
-        to: AccountId,
-    }
-
     /// Event emitted when an approval occurs that `spender` is allowed to withdraw
     /// up to the amount of `value` tokens from `owner`.
     #[ink(event)]
