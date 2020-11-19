@@ -6,10 +6,10 @@ Selendra Contract Registry is a WASM smart contract registry writen in Rust base
 
 ### Available Contracts
 
-- [ ] ERC-20 Contract.
+- [x] ERC-20 Contract.
 - [ ] ERC-1400 Security contract.
-- [ ] Escrow Contract.
-- [ ] Token on demand contract for stable currency.
+- [x] Escrow Contract.
+- [x] Token on demand contract for stable currency.
 
 ### Build 
 
