@@ -3,7 +3,7 @@
 use ink_lang as ink;
 
 #[ink::contract]
-mod stable_currency {
+mod escrow {
 
     use ink_storage::{collections::HashMap as StorageHashMap, lazy::Lazy};
 
@@ -17,16 +17,14 @@ mod stable_currency {
 
     pub type Result<T> = core::result::Result<T, Error>;
 
+    #[derive(Default)]
     #[ink(storage)]
-    pub struct StableCurrency {
-        ///Owner of Contract.
+    pub struct Escrow {
         owner: Lazy<AccountId>,
-        /// Total token supply.
         total_supply: Lazy<Balance>,
-        /// Mapping from owner to number of owned token.
         balances: StorageHashMap<AccountId, Balance>,
-        /// Mapping of the token amount which an account is allowed to withdraw from another account.
         allowances: StorageHashMap<(AccountId, AccountId), Balance>,
+        escrow_balances: StorageHashMap<(AccountId, AccountId), Balance>,
     }
 
     #[ink(event)]
@@ -38,8 +36,7 @@ mod stable_currency {
         #[ink(topic)]
         value: Balance,
     }
-    /// Event emitted when an approval occurs that `spender` is allowed to withdraw
-    /// up to the amount of `value` tokens from `owner`.
+
     #[ink(event)]
     pub struct Approval {
         #[ink(topic)]
@@ -50,7 +47,6 @@ mod stable_currency {
         value: Balance,
     }
 
-    ///Event emitted when ownership have transfer
     #[ink(event)]
     pub struct TransferOwnerShip {
         #[ink(topic)]
@@ -59,25 +55,7 @@ mod stable_currency {
         to: AccountId,
     }
 
-    ///Event emit when total have increment
-    #[ink(event)]
-    pub struct IncrementSupply {
-        #[ink(topic)]
-        from: AccountId,
-        #[ink(topic)]
-        value: Balance,
-    }
-
-    ///Event emit when total have decrement
-    #[ink(event)]
-    pub struct DecrementSupply {
-        #[ink(topic)]
-        from: AccountId,
-        #[ink(topic)]
-        value: Balance,
-    }
-
-    impl StableCurrency {
+    impl Escrow {
         #[ink(constructor)]
         pub fn new(initial_supply: Balance) -> Self {
             let caller = Self::env().caller();
@@ -91,13 +69,69 @@ mod stable_currency {
             });
 
             Self {
+                balances,
                 owner: Lazy::new(caller),
                 total_supply: Lazy::new(initial_supply),
-                balances,
                 allowances: StorageHashMap::new(),
+                escrow_balances: StorageHashMap::new(),
+            }
+        }
+        // ----------------------------------------------------------------------------------------------------------------
+        #[ink(message)]
+        pub fn create_payment(&mut self, seller: AccountId, value: Balance) -> Result<()> {
+            let order = self.env().caller();
+
+            let buyer_balance = self.balance_of_or_zero(&order);
+            if buyer_balance < value {
+                return Err(Error::InsufficientBalance);
+            }
+            self.balances.insert(order, buyer_balance - value);
+
+            let escrow_balance = self.escrow_of_or_zero(&order, &seller);
+            self.escrow_balances
+                .insert((order, seller), escrow_balance + value);
+            Ok(())
+        }
+
+        #[ink(message)]
+        pub fn complete_payment(&mut self, from: AccountId, to: AccountId) {
+            let caller = self.env().caller();
+            let esbalance = self.escrow_of_or_zero(&from, &to);
+
+            if esbalance != 0 {
+                if caller.clone() == from || caller.clone() == *self.owner {
+                    let balance = self.balance_of_or_zero(&to);
+                    self.balances.insert(to, esbalance + balance);
+
+                    self.escrow_balances.insert((from, to), 0);
+                }
             }
         }
 
+        #[ink(message)]
+        pub fn refund(&mut self, from: AccountId, to: AccountId) {
+            let caller = self.env().caller();
+            let esbalance = self.escrow_of_or_zero(&from, &to);
+
+            if esbalance != 0 {
+                if caller.clone() == to || caller.clone() == *self.owner {
+                    let balance = self.balance_of_or_zero(&from);
+                    self.balances.insert(from, esbalance + balance);
+
+                    self.escrow_balances.insert((from, to), 0);
+                }
+            }
+        }
+
+        #[ink(message)]
+        pub fn escrow_balance(&self, from: AccountId, to: AccountId) -> Balance {
+            self.escrow_of_or_zero(&from, &to)
+        }
+
+        fn escrow_of_or_zero(&self, order: &AccountId, seller: &AccountId) -> Balance {
+            *self.escrow_balances.get(&(*order, *seller)).unwrap_or(&0)
+        }
+        // ----------------------------------------------------------------------------------------------------------------
         #[ink(message)]
         pub fn total_supply(&self) -> Balance {
             *self.total_supply
@@ -114,7 +148,6 @@ mod stable_currency {
             let owner = self.env().caller();
             self.allowances.insert((owner, spender), value);
 
-            // Notify offchain users of the approval and report success.
             self.env().emit_event(Approval {
                 owner,
                 spender,
@@ -180,47 +213,11 @@ mod stable_currency {
 
         #[ink(message)]
         pub fn transfer_ownership(&mut self, to: AccountId) -> Result<()> {
-            let caller = Self::env().caller();
+            let caller = self.env().caller();
             let owner = *self.owner;
             self.only_owner(caller)?;
             *self.owner = to;
             self.env().emit_event(TransferOwnerShip { from: owner, to });
-            Ok(())
-        }
-
-        #[ink(message)]
-        pub fn inc_supply(&mut self, value: Balance) -> Result<()> {
-            let caller = Self::env().caller();
-            self.only_owner(caller)?;
-
-            let owner_balance = self.balance_of_or_zero(&caller);
-            *self.total_supply += value;
-            self.balances.insert(caller, owner_balance + value);
-
-            self.env().emit_event(IncrementSupply {
-                from: *self.owner,
-                value,
-            });
-            Ok(())
-        }
-
-        ///Decrement total supply only by owner.
-        #[ink(message)]
-        pub fn dec_supply(&mut self, value: Balance) -> Result<()> {
-            let caller = Self::env().caller();
-            self.only_owner(caller)?;
-
-            let owner_balance = self.balance_of_or_zero(&caller);
-            if owner_balance < value {
-                return Err(Error::InsufficientBalance);
-            }
-            *self.total_supply -= value;
-            self.balances.insert(caller, owner_balance - value);
-
-            self.env().emit_event(DecrementSupply {
-                from: *self.owner,
-                value,
-            });
             Ok(())
         }
 
@@ -239,6 +236,7 @@ mod stable_currency {
         fn allowance_of_or_zero(&self, owner: &AccountId, spender: &AccountId) -> Balance {
             *self.allowances.get(&(*owner, *spender)).unwrap_or(&0)
         }
+        // ----------------------------------------------------------------------------------------------------------------
     }
     #[cfg(test)]
     mod tests {
@@ -248,13 +246,13 @@ mod stable_currency {
 
         #[ink::test]
         fn new_works() {
-            let contract = StableCurrency::new(777);
+            let contract = Escrow::new(777);
             assert_eq!(contract.total_supply(), 777);
         }
 
         #[ink::test]
         fn balance_works() {
-            let contract = StableCurrency::new(100);
+            let contract = Escrow::new(100);
             assert_eq!(contract.total_supply(), 100);
             assert_eq!(contract.balance_of(AccountId::from([0x1; 32])), 100);
             assert_eq!(contract.balance_of(AccountId::from([0x0; 32])), 0);
@@ -262,7 +260,7 @@ mod stable_currency {
 
         #[ink::test]
         fn transfer_works() {
-            let mut contract = StableCurrency::new(100);
+            let mut contract = Escrow::new(100);
             assert_eq!(contract.balance_of(AccountId::from([0x1; 32])), 100);
             assert_eq!(contract.transfer(AccountId::from([0x0; 32]), 10), Ok(()));
             assert_eq!(contract.balance_of(AccountId::from([0x0; 32])), 10);
@@ -271,7 +269,7 @@ mod stable_currency {
 
         #[ink::test]
         fn transfer_from_works() {
-            let mut contract = StableCurrency::new(100);
+            let mut contract = Escrow::new(100);
             assert_eq!(contract.balance_of(AccountId::from([0x1; 32])), 100);
             contract.approve(AccountId::from([0x1; 32]), 20);
             contract
@@ -282,34 +280,18 @@ mod stable_currency {
 
         #[ink::test]
         fn onlyowner_works() {
-            let contract = StableCurrency::new(777);
+            let contract = Escrow::new(777);
             assert_eq!(contract.only_owner(AccountId::from([0x1; 32])), Ok(()));
         }
 
         #[ink::test]
         fn transfer_ownership_works() {
-            let mut contract = StableCurrency::new(777);
+            let mut contract = Escrow::new(777);
             assert_eq!(contract.only_owner(AccountId::from([0x1; 32])), Ok(()));
             contract
                 .transfer_ownership(AccountId::from([0x0; 32]))
                 .unwrap();
             assert_eq!(contract.only_owner(AccountId::from([0x0; 32])), Ok(()));
-        }
-
-        #[ink::test]
-        fn inc_subpply_works() {
-            let mut contract = StableCurrency::new(777);
-            contract.inc_supply(1000).unwrap();
-            assert_eq!(contract.total_supply(), 1777);
-            assert_eq!(contract.balance_of(AccountId::from([0x1; 32])), 1777);
-        }
-
-        #[ink::test]
-        fn dec_subpply_works() {
-            let mut contract = StableCurrency::new(777);
-            contract.dec_supply(10).unwrap();
-            assert_eq!(contract.total_supply(), 767);
-            assert_eq!(contract.balance_of(AccountId::from([0x1; 32])), 767);
         }
     }
 }
