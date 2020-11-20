@@ -12,6 +12,7 @@ mod escrow {
     pub enum Error {
         InsufficientBalance,
         InsufficientAllowance,
+        NoPermission,
         OnlyOwner,
     }
 
@@ -94,32 +95,35 @@ mod escrow {
         }
 
         #[ink(message)]
-        pub fn complete_payment(&mut self, from: AccountId, to: AccountId) {
+        pub fn complete_payment(&mut self, from: AccountId, to: AccountId) -> Result<()> {
             let caller = self.env().caller();
             let esbalance = self.escrow_of_or_zero(&from, &to);
 
-            if esbalance != 0 {
-                if caller.clone() == from || caller.clone() == *self.owner {
-                    let balance = self.balance_of_or_zero(&to);
-                    self.balances.insert(to, esbalance + balance);
+            if caller.clone() == from || caller.clone() == *self.owner {
+                let balance = self.balance_of_or_zero(&to);
+                self.balances.insert(to, esbalance + balance);
+                self.escrow_balances.insert((from, to), 0);
 
-                    self.escrow_balances.insert((from, to), 0);
-                }
+                Ok(())
+            } else {
+                Err(Error::NoPermission)
             }
         }
 
         #[ink(message)]
-        pub fn refund(&mut self, from: AccountId, to: AccountId) {
+        pub fn refund(&mut self, from: AccountId, to: AccountId) -> Result<()> {
             let caller = self.env().caller();
             let esbalance = self.escrow_of_or_zero(&from, &to);
 
-            if esbalance != 0 {
-                if caller.clone() == to || caller.clone() == *self.owner {
-                    let balance = self.balance_of_or_zero(&from);
-                    self.balances.insert(from, esbalance + balance);
+            if caller.clone() == to || caller.clone() == *self.owner {
+                let balance = self.balance_of_or_zero(&from);
+                self.balances.insert(from, esbalance + balance);
 
-                    self.escrow_balances.insert((from, to), 0);
-                }
+                self.escrow_balances.insert((from, to), 0);
+
+                Ok(())
+            } else {
+                Err(Error::NoPermission)
             }
         }
 
@@ -256,6 +260,42 @@ mod escrow {
             assert_eq!(contract.total_supply(), 100);
             assert_eq!(contract.balance_of(AccountId::from([0x1; 32])), 100);
             assert_eq!(contract.balance_of(AccountId::from([0x0; 32])), 0);
+        }
+
+        #[ink::test]
+        fn createpayment_works() {
+            let mut contract = Escrow::new(100);
+            let buyer = AccountId::from([0x1; 32]);
+            let seller = AccountId::from([0x0; 32]);
+            assert_eq!(contract.balance_of(buyer), 100);
+            assert_eq!(contract.create_payment(seller, 30), Ok(()));
+            assert_eq!(contract.balance_of(buyer), 70);
+            assert_eq!(contract.escrow_balance(buyer, seller), 30);
+        }
+
+        #[ink::test]
+        fn completepaymet_work() {
+            let mut contract = Escrow::new(100);
+            let buyer = AccountId::from([0x1; 32]);
+            let seller = AccountId::from([0x0; 32]);
+            assert_eq!(contract.create_payment(seller, 30), Ok(()));
+            assert_eq!(contract.balance_of(seller), 0);
+            assert_eq!(contract.complete_payment(buyer, seller), Ok(()));
+            assert_eq!(contract.balance_of(seller), 30);
+            assert_eq!(contract.create_payment(seller, 30), Ok(()));
+            assert_eq!(contract.complete_payment(buyer, seller), Ok(()));
+            assert_eq!(contract.balance_of(seller), 60);
+        }
+
+        #[ink::test]
+        fn refund_work() {
+            let mut contract = Escrow::new(100);
+            let buyer = AccountId::from([0x1; 32]);
+            let seller = AccountId::from([0x0; 32]);
+            assert_eq!(contract.create_payment(seller, 30), Ok(()));
+            assert_eq!(contract.balance_of(buyer), 70);
+            assert_eq!(contract.refund(buyer, seller), Ok(()));
+            assert_eq!(contract.balance_of(buyer), 100);
         }
 
         #[ink::test]
