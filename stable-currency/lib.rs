@@ -180,7 +180,7 @@ mod stable_currency {
 
         #[ink(message)]
         pub fn transfer_ownership(&mut self, to: AccountId) -> Result<()> {
-            let caller = Self::env().caller();
+            let caller = self.env().caller();
             let owner = *self.owner;
             self.only_owner(caller)?;
             *self.owner = to;
@@ -190,7 +190,7 @@ mod stable_currency {
 
         #[ink(message)]
         pub fn inc_supply(&mut self, value: Balance) -> Result<()> {
-            let caller = Self::env().caller();
+            let caller = self.env().caller();
             self.only_owner(caller)?;
 
             let owner_balance = self.balance_of_or_zero(&caller);
@@ -207,7 +207,7 @@ mod stable_currency {
         ///Decrement total supply only by owner.
         #[ink(message)]
         pub fn dec_supply(&mut self, value: Balance) -> Result<()> {
-            let caller = Self::env().caller();
+            let caller = self.env().caller();
             self.only_owner(caller)?;
 
             let owner_balance = self.balance_of_or_zero(&caller);
