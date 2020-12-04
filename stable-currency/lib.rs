@@ -27,6 +27,8 @@ mod stable_currency {
         balances: StorageHashMap<AccountId, Balance>,
         /// Mapping of the token amount which an account is allowed to withdraw from another account.
         allowances: StorageHashMap<(AccountId, AccountId), Balance>,
+        /// Token symbol
+        symbol: String
     }
 
     #[ink(event)]
@@ -79,7 +81,7 @@ mod stable_currency {
 
     impl StableCurrency {
         #[ink(constructor)]
-        pub fn new(initial_supply: Balance) -> Self {
+        pub fn new(initial_supply: Balance, symbol: String) -> Self {
             let caller = Self::env().caller();
             let mut balances = StorageHashMap::new();
             balances.insert(caller, initial_supply);
@@ -95,6 +97,7 @@ mod stable_currency {
                 total_supply: Lazy::new(initial_supply),
                 balances,
                 allowances: StorageHashMap::new(),
+                symbol
             }
         }
 
@@ -248,13 +251,15 @@ mod stable_currency {
 
         #[ink::test]
         fn new_works() {
-            let contract = StableCurrency::new(777);
+            let contract = StableCurrency::new(777, "rsel".to_string());
             assert_eq!(contract.total_supply(), 777);
+            assert_eq!(contract.symbol, "rsel".to_owned());
+            assert_ne!(contract.symbol, "sel".to_owned())
         }
 
         #[ink::test]
         fn balance_works() {
-            let contract = StableCurrency::new(100);
+            let contract = StableCurrency::new(100, "rsel".to_string());
             assert_eq!(contract.total_supply(), 100);
             assert_eq!(contract.balance_of(AccountId::from([0x1; 32])), 100);
             assert_eq!(contract.balance_of(AccountId::from([0x0; 32])), 0);
@@ -262,7 +267,7 @@ mod stable_currency {
 
         #[ink::test]
         fn transfer_works() {
-            let mut contract = StableCurrency::new(100);
+            let mut contract = StableCurrency::new(100, "rsel".to_string());
             assert_eq!(contract.balance_of(AccountId::from([0x1; 32])), 100);
             assert_eq!(contract.transfer(AccountId::from([0x0; 32]), 10), Ok(()));
             assert_eq!(contract.balance_of(AccountId::from([0x0; 32])), 10);
@@ -271,7 +276,7 @@ mod stable_currency {
 
         #[ink::test]
         fn transfer_from_works() {
-            let mut contract = StableCurrency::new(100);
+            let mut contract = StableCurrency::new(100, "rsel".to_string());
             assert_eq!(contract.balance_of(AccountId::from([0x1; 32])), 100);
             contract.approve(AccountId::from([0x1; 32]), 20);
             contract
@@ -282,13 +287,13 @@ mod stable_currency {
 
         #[ink::test]
         fn onlyowner_works() {
-            let contract = StableCurrency::new(777);
+            let contract = StableCurrency::new(777, "rsel".to_string());
             assert_eq!(contract.only_owner(AccountId::from([0x1; 32])), Ok(()));
         }
 
         #[ink::test]
         fn transfer_ownership_works() {
-            let mut contract = StableCurrency::new(777);
+            let mut contract = StableCurrency::new(777, "rsel".to_string());
             assert_eq!(contract.only_owner(AccountId::from([0x1; 32])), Ok(()));
             contract
                 .transfer_ownership(AccountId::from([0x0; 32]))
@@ -298,7 +303,7 @@ mod stable_currency {
 
         #[ink::test]
         fn inc_subpply_works() {
-            let mut contract = StableCurrency::new(777);
+            let mut contract = StableCurrency::new(777, "rsel".to_string());
             contract.inc_supply(1000).unwrap();
             assert_eq!(contract.total_supply(), 1777);
             assert_eq!(contract.balance_of(AccountId::from([0x1; 32])), 1777);
@@ -306,7 +311,7 @@ mod stable_currency {
 
         #[ink::test]
         fn dec_subpply_works() {
-            let mut contract = StableCurrency::new(777);
+            let mut contract = StableCurrency::new(777, "rsel".to_string());
             contract.dec_supply(10).unwrap();
             assert_eq!(contract.total_supply(), 767);
             assert_eq!(contract.balance_of(AccountId::from([0x1; 32])), 767);
