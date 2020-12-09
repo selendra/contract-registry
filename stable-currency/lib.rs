@@ -14,6 +14,7 @@ mod stable_currency {
         InsufficientBalance,
         InsufficientAllowance,
         OnlyOwner,
+        NotPermission
     }
 
     pub type Result<T> = core::result::Result<T, Error>;
@@ -140,32 +141,6 @@ mod stable_currency {
             self.transfer_from_to(self.env().caller(), to, value)
         }
 
-        fn transfer_from_to(
-            &mut self,
-            from: AccountId,
-            to: AccountId,
-            value: Balance,
-        ) -> Result<()> {
-            let from_balance = self.balance_of_or_zero(&from);
-            if from_balance < value {
-                return Err(Error::InsufficientBalance);
-            }
-
-            // Update the sender's balance.
-            self.balances.insert(from, from_balance - value);
-
-            // Update the receiver's balance.
-            let to_balance = self.balance_of_or_zero(&to);
-            self.balances.insert(to, to_balance + value);
-
-            self.env().emit_event(Transfer {
-                from: Some(from),
-                to: Some(to),
-                value,
-            });
-            Ok(())
-        }
-
         #[ink(message)]
         pub fn transfer_ownership(&mut self, to: AccountId) -> Result<()> {
             let caller = self.env().caller();
@@ -202,6 +177,90 @@ mod stable_currency {
             self.balances.insert(caller, owner_balance - value);
 
             Ok(())
+        }
+
+        #[ink(message)]
+        pub fn create_payment(&mut self, seller: AccountId, value: Balance) -> Result<()> {
+            let order = self.env().caller();
+
+            let buyer_balance = self.balance_of_or_zero(&order);
+            if buyer_balance < value {
+                return Err(Error::InsufficientBalance);
+            }
+            self.balances.insert(order, buyer_balance - value);
+
+            let escrow_balance = self.escrow_of_or_zero(&order, &seller);
+            self.escrow_balances
+                .insert((order, seller), escrow_balance + value);
+            Ok(())
+        }
+
+        #[ink(message)]
+        pub fn complete_payment(&mut self, from: AccountId, to: AccountId) -> Result<()> {
+            let caller = self.env().caller();
+            let esbalance = self.escrow_of_or_zero(&from, &to);
+
+            if caller.clone() == from || caller.clone() == *self.owner {
+                let balance = self.balance_of_or_zero(&to);
+                self.balances.insert(to, esbalance + balance);
+                self.escrow_balances.insert((from, to), 0);
+
+                Ok(())
+            } else {
+                Err(Error::NotPermission)
+            }
+        }
+
+        #[ink(message)]
+        pub fn refund(&mut self, from: AccountId, to: AccountId) -> Result<()> {
+            let caller = self.env().caller();
+            let esbalance = self.escrow_of_or_zero(&from, &to);
+
+            if caller.clone() == to || caller.clone() == *self.owner {
+                let balance = self.balance_of_or_zero(&from);
+                self.balances.insert(from, esbalance + balance);
+
+                self.escrow_balances.insert((from, to), 0);
+
+                Ok(())
+            } else {
+                Err(Error::NotPermission)
+            }
+        }
+
+        #[ink(message)]
+        pub fn escrow_balance(&self, from: AccountId, to: AccountId) -> Balance {
+            self.escrow_of_or_zero(&from, &to)
+        }
+
+        fn transfer_from_to(
+            &mut self,
+            from: AccountId,
+            to: AccountId,
+            value: Balance,
+        ) -> Result<()> {
+            let from_balance = self.balance_of_or_zero(&from);
+            if from_balance < value {
+                return Err(Error::InsufficientBalance);
+            }
+
+            // Update the sender's balance.
+            self.balances.insert(from, from_balance - value);
+
+            // Update the receiver's balance.
+            let to_balance = self.balance_of_or_zero(&to);
+            self.balances.insert(to, to_balance + value);
+
+            self.env().emit_event(Transfer {
+                from: Some(from),
+                to: Some(to),
+                value,
+            });
+            Ok(())
+        }
+
+        fn escrow_of_or_zero(&self, order: &AccountId, seller: &AccountId) -> Balance {
+            *self.escrow_balances.get(&(*order, *seller)).unwrap_or(&0)
         }
 
         fn cal_fee(self, value: u64) -> u64 {
@@ -296,6 +355,42 @@ mod stable_currency {
             contract.dec_supply(10).unwrap();
             assert_eq!(contract.total_supply(), 767);
             assert_eq!(contract.balance_of(AccountId::from([0x1; 32])), 767);
+        }
+
+        #[ink::test]
+        fn createpayment_works() {
+            let mut contract = StableCurrency::new(100,  "rsel".to_string());
+            let buyer = AccountId::from([0x1; 32]);
+            let seller = AccountId::from([0x0; 32]);
+            assert_eq!(contract.balance_of(buyer), 100);
+            assert_eq!(contract.create_payment(seller, 30), Ok(()));
+            assert_eq!(contract.balance_of(buyer), 70);
+            assert_eq!(contract.escrow_balance(buyer, seller), 30);
+        }
+
+        #[ink::test]
+        fn completepaymet_work() {
+            let mut contract = StableCurrency::new(100,  "rsel".to_string());
+            let buyer = AccountId::from([0x1; 32]);
+            let seller = AccountId::from([0x0; 32]);
+            assert_eq!(contract.create_payment(seller, 30), Ok(()));
+            assert_eq!(contract.balance_of(seller), 0);
+            assert_eq!(contract.complete_payment(buyer, seller), Ok(()));
+            assert_eq!(contract.balance_of(seller), 30);
+            assert_eq!(contract.create_payment(seller, 30), Ok(()));
+            assert_eq!(contract.complete_payment(buyer, seller), Ok(()));
+            assert_eq!(contract.balance_of(seller), 60);
+        }
+
+        #[ink::test]
+        fn refund_work() {
+            let mut contract = StableCurrency::new(100,  "rsel".to_string());
+            let buyer = AccountId::from([0x1; 32]);
+            let seller = AccountId::from([0x0; 32]);
+            assert_eq!(contract.create_payment(seller, 30), Ok(()));
+            assert_eq!(contract.balance_of(buyer), 70);
+            assert_eq!(contract.refund(buyer, seller), Ok(()));
+            assert_eq!(contract.balance_of(buyer), 100);
         }
     }
 }
