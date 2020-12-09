@@ -168,14 +168,16 @@ mod stable_currency {
         }
 
         #[ink(message)]
-        pub fn create_payment(&mut self, seller: AccountId, value: Balance) -> Result<()> {
+        pub fn create_payment(&mut self, seller: AccountId, value: u64) -> Result<()> {
             let order = self.env().caller();
+            let fee = self.cal_fee(value);
+            let value = (value.checked_add(fee).unwrap_or(0)) as Balance;
 
-            let buyer_balance = self.balance_of_or_zero(&order);
-            if buyer_balance < value {
+            let order_balance = self.balance_of_or_zero(&order);
+            if order_balance < value {
                 return Err(Error::InsufficientBalance);
             }
-            self.balances.insert(order, buyer_balance - value);
+            self.balances.insert(order, order_balance - value);
 
             let escrow_balance = self.escrow_of_or_zero(&order, &seller);
             self.escrow_balances
@@ -186,11 +188,18 @@ mod stable_currency {
         #[ink(message)]
         pub fn complete_payment(&mut self, from: AccountId, to: AccountId) -> Result<()> {
             let caller = self.env().caller();
-            let esbalance = self.escrow_of_or_zero(&from, &to);
 
             if caller.clone() == from || caller.clone() == *self.owner {
-                let balance = self.balance_of_or_zero(&to);
-                self.balances.insert(to, esbalance + balance);
+                let esbalance = self.escrow_of_or_zero(&from, &to);
+                let fee = (self.cal_fee(esbalance as u64)) as Balance;
+                let esbalance = esbalance - fee;
+                
+                let tobalance = self.balance_of_or_zero(&to);
+                self.balances.insert(to, esbalance + tobalance);
+                
+                let callbalance = self.balance_of_or_zero(&caller.clone());
+                self.balances.insert(caller, fee + callbalance);
+                
                 self.escrow_balances.insert((from, to), 0);
 
                 Ok(())
@@ -251,8 +260,12 @@ mod stable_currency {
             *self.escrow_balances.get(&(*order, *seller)).unwrap_or(&0)
         }
 
-        fn cal_fee(self, value: u64) -> u64 {
-            value.checked_div(100).unwrap_or(1)
+        fn cal_fee(&self, value: u64) -> u64 {
+            let mut fee = value.checked_div(100).unwrap_or(1);
+            if fee == 0 {
+                fee = 1;
+            }
+            fee
         }
 
         fn only_owner(&self, caller: AccountId) -> Result<()> {
@@ -352,8 +365,8 @@ mod stable_currency {
             let seller = AccountId::from([0x0; 32]);
             assert_eq!(contract.balance_of(buyer), 100);
             assert_eq!(contract.create_payment(seller, 30), Ok(()));
-            assert_eq!(contract.balance_of(buyer), 70);
-            assert_eq!(contract.escrow_balance(buyer, seller), 30);
+            assert_eq!(contract.balance_of(buyer), 69);
+            assert_eq!(contract.escrow_balance(buyer, seller), 31);
         }
 
         #[ink::test]
@@ -376,7 +389,7 @@ mod stable_currency {
             let buyer = AccountId::from([0x1; 32]);
             let seller = AccountId::from([0x0; 32]);
             assert_eq!(contract.create_payment(seller, 30), Ok(()));
-            assert_eq!(contract.balance_of(buyer), 70);
+            assert_eq!(contract.balance_of(buyer), 69);
             assert_eq!(contract.refund(buyer, seller), Ok(()));
             assert_eq!(contract.balance_of(buyer), 100);
         }
