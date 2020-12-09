@@ -6,6 +6,7 @@ use ink_lang as ink;
 mod stable_currency {
 
     use ink_storage::{collections::HashMap as StorageHashMap, lazy::Lazy};
+    use ink_prelude::string::String;
 
     #[derive(Debug, PartialEq, Eq, scale::Encode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
@@ -104,6 +105,11 @@ mod stable_currency {
         #[ink(message)]
         pub fn total_supply(&self) -> Balance {
             *self.total_supply
+        }
+
+        #[ink(message)]
+        pub fn token_symbol(&self) -> String {
+            self.symbol.clone()
         }
 
         #[ink(message)]
