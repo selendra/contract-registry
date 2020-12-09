@@ -64,36 +64,12 @@ mod stable_currency {
         to: AccountId,
     }
 
-    ///Event emit when total have increment
-    #[ink(event)]
-    pub struct IncrementSupply {
-        #[ink(topic)]
-        from: AccountId,
-        #[ink(topic)]
-        value: Balance,
-    }
-
-    ///Event emit when total have decrement
-    #[ink(event)]
-    pub struct DecrementSupply {
-        #[ink(topic)]
-        from: AccountId,
-        #[ink(topic)]
-        value: Balance,
-    }
-
     impl StableCurrency {
         #[ink(constructor)]
         pub fn new(initial_supply: Balance, symbol: String) -> Self {
             let caller = Self::env().caller();
             let mut balances = StorageHashMap::new();
             balances.insert(caller, initial_supply);
-
-            Self::env().emit_event(Transfer {
-                from: None,
-                to: Some(caller),
-                value: initial_supply,
-            });
 
             Self {
                 owner: Lazy::new(caller),
@@ -209,10 +185,6 @@ mod stable_currency {
             *self.total_supply += value;
             self.balances.insert(caller, owner_balance + value);
 
-            self.env().emit_event(IncrementSupply {
-                from: *self.owner,
-                value,
-            });
             Ok(())
         }
 
@@ -229,15 +201,11 @@ mod stable_currency {
             *self.total_supply -= value;
             self.balances.insert(caller, owner_balance - value);
 
-            self.env().emit_event(DecrementSupply {
-                from: *self.owner,
-                value,
-            });
             Ok(())
         }
 
         fn cal_fee(self, value: u64) -> u64 {
-            value.checked_div(100)
+            value.checked_div(100).unwrap_or(1)
         }
 
         fn only_owner(&self, caller: AccountId) -> Result<()> {
