@@ -29,7 +29,9 @@ mod stable_currency {
         /// Mapping of the token amount which an account is allowed to withdraw from another account.
         allowances: StorageHashMap<(AccountId, AccountId), Balance>,
         /// Token symbol
-        symbol: String
+        symbol: String,
+        ///ecrow balance
+        escrow_balances: StorageHashMap<(AccountId, AccountId), Balance>,
     }
 
     #[ink(event)]
@@ -96,8 +98,9 @@ mod stable_currency {
             Self {
                 owner: Lazy::new(caller),
                 total_supply: Lazy::new(initial_supply),
-                balances,
+                escrow_balances: StorageHashMap::new(),
                 allowances: StorageHashMap::new(),
+                balances,
                 symbol
             }
         }
@@ -231,6 +234,10 @@ mod stable_currency {
                 value,
             });
             Ok(())
+        }
+
+        fn cal_fee(self, value: u64) -> u64 {
+            value.checked_div(100)
         }
 
         fn only_owner(&self, caller: AccountId) -> Result<()> {
