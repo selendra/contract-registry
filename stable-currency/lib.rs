@@ -56,15 +56,6 @@ mod stable_currency {
         value: Balance,
     }
 
-    ///Event emitted when ownership have transfer
-    #[ink(event)]
-    pub struct TransferOwnerShip {
-        #[ink(topic)]
-        from: AccountId,
-        #[ink(topic)]
-        to: AccountId,
-    }
-
     impl StableCurrency {
         #[ink(constructor)]
         pub fn new(initial_supply: Balance, symbol: String) -> Self {
@@ -143,11 +134,8 @@ mod stable_currency {
 
         #[ink(message)]
         pub fn transfer_ownership(&mut self, to: AccountId) -> Result<()> {
-            let caller = self.env().caller();
-            let owner = *self.owner;
-            self.only_owner(caller)?;
+            self.only_owner(self.env().caller())?;
             *self.owner = to;
-            self.env().emit_event(TransferOwnerShip { from: owner, to });
             Ok(())
         }
 
