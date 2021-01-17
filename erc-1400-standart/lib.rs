@@ -74,5 +74,15 @@ mod erc1400 {
         pub fn balance_of(&self, token_holder: AccountId) -> Balance {
             self.balances.get(&token_holder).copied().unwrap_or(0)
         }
+
+        #[ink(message)]
+        pub fn only_owner(&self) -> bool {
+            let caller = self.env().caller();
+            if caller == *self.owner {
+                true
+            } else {
+                false
+            }
+        }
     }
 }
