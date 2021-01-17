@@ -65,5 +65,9 @@ mod erc1400 {
             }
         }
 
+        #[ink(message)]
+        pub fn total_supply(&self) -> Balance {
+            self.total_supply
+        }
     }
 }
