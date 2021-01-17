@@ -5,7 +5,7 @@ pub mod models;
 #[ink::contract]
 mod erc1400 {
     use super::*;
-    use models::doc::*;
+    use models::{ doc::*, error::*};
 
     use ink_prelude::{string::String, vec::Vec};
     use ink_storage::{collections::HashMap as StorageHashMap, Lazy };
@@ -73,6 +73,16 @@ mod erc1400 {
         #[ink(message)]
         pub fn balance_of(&self, token_holder: AccountId) -> Balance {
             self.balances.get(&token_holder).copied().unwrap_or(0)
+        }
+
+        #[ink(message)]
+        pub fn set_controller(&mut self, controller: AccountId) -> Result<(), Error> {
+            if self.only_owner() {
+                self.controllers.insert(controller, true);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
         }
 
         #[ink(message)]
