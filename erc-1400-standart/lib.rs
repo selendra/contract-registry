@@ -74,6 +74,24 @@ mod erc1400 {
         }
 
         #[ink(message)]
+        pub fn issue_by_partition(&mut self, partition: Hash, amount: Balance) {
+            let caller = self.env().caller();
+            self.total_supply += amount;
+
+            let balance = self.balance_of(caller);
+            self.balances.insert(caller, balance + amount);
+
+            if self.is_partition(partition) == false {
+                self.total_paritions.push(partition);
+                let mut own_partition: Vec<Hash> = Vec::new();
+                own_partition.push(partition);
+                self.partitions_of.insert(caller, own_partition);
+            };
+            let p_balance = self.balance_of_partition.get(&(caller, partition)).copied().unwrap_or(0);
+            self.balance_of_partition.insert((caller, partition), amount + p_balance);
+        }
+
+        #[ink(message)]
         pub fn list_of_partition(&self) -> Vec<Hash> {
             self.total_paritions.clone()
         }
@@ -86,6 +104,10 @@ mod erc1400 {
             }else {
                 return  Err(Error::NotAllowed);
             }
+        }
+
+        fn is_partition(&self, partition: Hash) -> bool {
+            self.total_paritions.contains(&partition)
         }
 
         fn is_controllable(&self) -> bool {
