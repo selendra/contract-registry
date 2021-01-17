@@ -85,6 +85,11 @@ mod erc1400 {
             }
         }
 
+        fn is_controllable(&self) -> bool {
+            let caller = self.env().caller();
+            self.controllers.get(&caller).copied().unwrap_or(false)
+        }
+
         #[ink(message)]
         pub fn only_owner(&self) -> bool {
             let caller = self.env().caller();
