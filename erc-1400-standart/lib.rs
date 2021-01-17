@@ -13,7 +13,6 @@ mod erc1400 {
     #[ink(storage)]
     pub struct Erc1400 {
         symbol: Lazy<String>,
-        granularity: Lazy<Balance>,
         total_supply: Balance,
         balances: StorageHashMap<AccountId, Balance>,
         allow: StorageHashMap<AccountId, Balance>,
@@ -43,12 +42,11 @@ mod erc1400 {
 
     impl Erc1400 {
         #[ink(constructor)]
-        pub fn new(token_symbol: String, granularity: Balance) -> Self {
+        pub fn new(token_symbol: String) -> Self {
             let caller = Self::env().caller();
 
             Self { 
                 symbol: Lazy::new(token_symbol),
-                granularity: Lazy::new(granularity),
                 total_supply: 0,
                 balances: StorageHashMap::new(),
                 allow: StorageHashMap::new(),
@@ -76,6 +74,11 @@ mod erc1400 {
         }
 
         #[ink(message)]
+        pub fn list_of_partition(&self) -> Vec<Hash> {
+            self.total_paritions.clone()
+        }
+
+        #[ink(message)]
         pub fn set_controller(&mut self, controller: AccountId) -> Result<(), Error> {
             if self.only_owner() {
                 self.controllers.insert(controller, true);
@@ -90,7 +93,6 @@ mod erc1400 {
             self.controllers.get(&caller).copied().unwrap_or(false)
         }
 
-        #[ink(message)]
         pub fn only_owner(&self) -> bool {
             let caller = self.env().caller();
             if caller == *self.owner {
