@@ -12,7 +12,7 @@ mod erc1400 {
 
     #[ink(storage)]
     pub struct Erc1400 {
-        symbol: Lazy<String>,
+        symbol: String,
         total_supply: Balance,
         balances: StorageHashMap<AccountId, Balance>,
         allow: StorageHashMap<AccountId, Balance>,
@@ -46,7 +46,7 @@ mod erc1400 {
             let caller = Self::env().caller();
 
             Self { 
-                symbol: Lazy::new(token_symbol),
+                symbol: token_symbol,
                 total_supply: 0,
                 balances: StorageHashMap::new(),
                 allow: StorageHashMap::new(),
@@ -71,6 +71,11 @@ mod erc1400 {
         #[ink(message)]
         pub fn balance_of(&self, token_holder: AccountId) -> Balance {
             self.balances.get(&token_holder).copied().unwrap_or(0)
+        }
+
+        #[ink(message)]
+        pub fn symbol(&self) -> String {
+            self.symbol.clone()
         }
 
         #[ink(message)]
