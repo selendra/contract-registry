@@ -69,5 +69,10 @@ mod erc1400 {
         pub fn total_supply(&self) -> Balance {
             self.total_supply
         }
+
+        #[ink(message)]
+        pub fn balance_of(&self, token_holder: AccountId) -> Balance {
+            self.balances.get(&token_holder).copied().unwrap_or(0)
+        }
     }
 }
