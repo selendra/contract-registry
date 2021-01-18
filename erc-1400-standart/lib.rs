@@ -100,7 +100,7 @@ mod erc1400 {
             let caller = self.env().caller();
             if self.is_controllable() {
                 self.total_supply += amount;
-                
+
                 let tpb = self.total_supply_by_partition(partition);
                 self.total_supply_by_partition.insert(partition, amount + tpb);
 
@@ -129,6 +129,32 @@ mod erc1400 {
             }else {
                 return  Err(Error::NotAllowed);
             }
+        }
+
+        #[ink(message)]
+        pub fn transfer(&mut self, partition: Hash, to: AccountId, amount: Balance) -> Result<(), Error>{
+            let caller = self.env().caller();
+            self.transfer_from_to(partition, caller, to, amount)?;
+            Ok(())
+        }
+
+        fn transfer_from_to(&mut self, partition: Hash, from: AccountId, to: AccountId, amount: Balance) -> Result<(), Error> {
+            let from_balannce = self.balance_of_by_partition(from, partition);
+            if from_balannce < amount {
+                return Err(Error::InsufficientBalance);
+            }
+            self.balance_of_partition.insert((from, partition), from_balannce - amount);
+
+            let from_balances = self.balance_of(from);
+            self.balances.insert(from, from_balances - amount);
+
+            let to_balances = self.balance_of(to);
+            self.balances.insert(to, to_balances+ amount);
+
+            let to_balannce = self.balance_of_by_partition(to, partition);
+            self.balance_of_partition.insert((to, partition), to_balannce + amount);
+
+            Ok(())
         }
 
         fn is_partition(&self, partition: Hash) -> bool {
