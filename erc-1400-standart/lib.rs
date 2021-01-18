@@ -132,7 +132,7 @@ mod erc1400 {
         }
 
         #[ink(message)]
-        pub fn set_controller_by_partition(&mut self, partition: Hash, controller: AccountId) -> Result<(), Error> {
+        pub fn set_controller_by_partition(&mut self,controller: AccountId, partition: Hash) -> Result<(), Error> {
             if self.only_owner() {
                 self.controllers_by_partition.insert((controller, partition), true);
                 Ok(())
@@ -152,7 +152,7 @@ mod erc1400 {
         }
 
         #[ink(message)]
-        pub fn renounce_controller_by_partitons(&mut self, partition: Hash, controller: AccountId) -> Result<(), Error> {
+        pub fn renounce_controller_by_partitons(&mut self,controller: AccountId, partition: Hash) -> Result<(), Error> {
             if self.only_owner() {
                 self.controllers_by_partition.insert((controller, partition), false);
                 Ok(())
@@ -163,13 +163,13 @@ mod erc1400 {
 
 
         #[ink(message)]
-        pub fn transfer(&mut self, partition: Hash, to: AccountId, amount: Balance) -> Result<(), Error>{
+        pub fn transfer(&mut self, to: AccountId, partition: Hash, amount: Balance) -> Result<(), Error>{
             let caller = self.env().caller();
-            self.transfer_from_to(partition, caller, to, amount)?;
+            self.transfer_from_to(caller, to,partition, amount)?;
             Ok(())
         }
 
-        fn transfer_from_to(&mut self, partition: Hash, from: AccountId, to: AccountId, amount: Balance) -> Result<(), Error> {
+        fn transfer_from_to(&mut self,from: AccountId, to: AccountId, partition: Hash,  amount: Balance) -> Result<(), Error> {
             let from_balannce = self.balance_of_by_partition(from, partition);
             if from_balannce < amount {
                 return Err(Error::InsufficientBalance);
