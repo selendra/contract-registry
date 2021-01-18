@@ -28,18 +28,6 @@ mod erc1400 {
         controllers_by_partition: StorageHashMap<(AccountId, Hash), bool>
     }
 
-    #[ink(event)]
-    pub struct TransferByPartition {
-        #[ink(topic)]
-        from: Option<AccountId>,
-        #[ink(topic)]
-        to: Option<AccountId>,
-        #[ink(topic)]
-        amount: Option<AccountId>,
-        #[ink(topic)]
-        data: Option<AccountId>,
-    }
-
     impl Erc1400 {
         #[ink(constructor)]
         pub fn new(token_symbol: String) -> Self {
@@ -81,6 +69,7 @@ mod erc1400 {
         #[ink(message)]
         pub fn issue_by_partition(&mut self, partition: Hash, amount: Balance) {
             let caller = self.env().caller();
+
             self.total_supply += amount;
 
             let balance = self.balance_of(caller);
