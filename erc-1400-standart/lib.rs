@@ -14,6 +14,7 @@ mod erc1400 {
     pub struct Erc1400 {
         symbol: String,
         total_supply: Balance,
+        total_supply_by_partition: StorageHashMap<Hash, Balance>,
         balances: StorageHashMap<AccountId, Balance>,
         allow: StorageHashMap<AccountId, Balance>,
         documents: Vec<Document>,
@@ -38,6 +39,7 @@ mod erc1400 {
             Self { 
                 symbol: token_symbol,
                 total_supply: 0,
+                total_supply_by_partition: StorageHashMap::new(),
                 balances: StorageHashMap::new(),
                 allow: StorageHashMap::new(),
                 documents: Vec::new(),
@@ -56,6 +58,11 @@ mod erc1400 {
         #[ink(message)]
         pub fn total_supply(&self) -> Balance {
             self.total_supply
+        }
+
+        #[ink(message)]
+        pub fn total_supply_by_partition(&self, partition: Hash) -> Balance {
+            self.total_supply_by_partition.get(&partition).copied().unwrap_or(0)
         }
 
         #[ink(message)]
@@ -93,6 +100,9 @@ mod erc1400 {
             let caller = self.env().caller();
             if self.is_controllable() {
                 self.total_supply += amount;
+                
+                let tpb = self.total_supply_by_partition(partition);
+                self.total_supply_by_partition.insert(partition, amount + tpb);
 
                 let balance = self.balance_of(caller);
                 self.balances.insert(caller, balance + amount);
