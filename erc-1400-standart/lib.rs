@@ -98,7 +98,7 @@ mod erc1400 {
         #[ink(message)]
         pub fn issue_by_partition(&mut self, partition: Hash, amount: Balance) -> Result<(), Error> {
             let caller = self.env().caller();
-            if self.is_controllable() {
+            if self.is_issueable(partition) {
                 self.total_supply += amount;
 
                 let tpb = self.total_supply_by_partition(partition);
@@ -169,6 +169,27 @@ mod erc1400 {
             Ok(())
         }
 
+        fn is_issueable(&self, partition: Hash) -> bool {
+            if self.only_owner() {
+                true
+            }else if self.is_controller() {
+                true
+            }else if self.is_controller_by_partition(partition) {
+                true
+            }else {
+                false
+            }
+        }
+
+        fn is_partition(&self, partition: Hash) -> bool {
+            self.total_paritions.contains(&partition)
+        }
+
+        fn is_controller(&self) -> bool {
+            let caller = self.env().caller();
+            self.controllers.get(&caller).copied().unwrap_or(false)
+        }
+
         fn transfer_from_to(&mut self,from: AccountId, to: AccountId, partition: Hash,  amount: Balance) -> Result<(), Error> {
             let from_balannce = self.balance_of_by_partition(from, partition);
             if from_balannce < amount {
@@ -188,13 +209,9 @@ mod erc1400 {
             Ok(())
         }
 
-        fn is_partition(&self, partition: Hash) -> bool {
-            self.total_paritions.contains(&partition)
-        }
-
-        fn is_controllable(&self) -> bool {
+        fn is_controller_by_partition(&self, partition: Hash) -> bool {
             let caller = self.env().caller();
-            self.controllers.get(&caller).copied().unwrap_or(false)
+            self.controllers_by_partition.get(&(caller, partition)).copied().unwrap_or(false)
         }
 
         pub fn only_owner(&self) -> bool {
