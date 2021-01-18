@@ -7,7 +7,6 @@ mod erc1400 {
     use super::*;
     use models::{ doc::*, error::*};
 
-    use ink_prelude::borrow::ToOwned;
     use ink_prelude::{string::String, vec::Vec};
     use ink_storage::{collections::HashMap as StorageHashMap, Lazy };
 
@@ -75,6 +74,16 @@ mod erc1400 {
         }
 
         #[ink(message)]
+        pub fn partion_of_token_holder(&self, token_holder: AccountId) -> Vec<Hash>{
+            match self.partitions_of.get(&token_holder) {
+                None => Vec::new(),
+                Some(p) => {
+                    p.clone()
+                }
+            }
+        }
+
+        #[ink(message)]
         pub fn symbol(&self) -> String {
             self.symbol.clone()
         }
@@ -90,7 +99,7 @@ mod erc1400 {
 
                 if self.is_partition(partition) == false {
                     self.total_paritions.push(partition);
-                    let mut own_partition: Vec<Hash> = Vec::new();
+                    let mut own_partition = self.partion_of_token_holder(caller);
                     own_partition.push(partition);
                     self.partitions_of.insert(caller, own_partition);
                 };
