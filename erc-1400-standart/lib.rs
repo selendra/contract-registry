@@ -132,6 +132,37 @@ mod erc1400 {
         }
 
         #[ink(message)]
+        pub fn set_controller_by_partition(&mut self, partition: Hash, controller: AccountId) -> Result<(), Error> {
+            if self.only_owner() {
+                self.controllers_by_partition.insert((controller, partition), true);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+        #[ink(message)]
+        pub fn renounce_controller(&mut self, controller: AccountId) -> Result<(), Error> {
+            if self.only_owner() {
+                self.controllers.insert(controller, false);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+        #[ink(message)]
+        pub fn renounce_controller_by_partitons(&mut self, partition: Hash, controller: AccountId) -> Result<(), Error> {
+            if self.only_owner() {
+                self.controllers_by_partition.insert((controller, partition), false);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+
+        #[ink(message)]
         pub fn transfer(&mut self, partition: Hash, to: AccountId, amount: Balance) -> Result<(), Error>{
             let caller = self.env().caller();
             self.transfer_from_to(partition, caller, to, amount)?;
