@@ -32,6 +32,8 @@ mod erc1400 {
         #[ink(constructor)]
         pub fn new(token_symbol: String) -> Self {
             let caller = Self::env().caller();
+            let mut controllers = StorageHashMap::new();
+            controllers.insert(caller, true);
 
             Self { 
                 symbol: token_symbol,
@@ -44,7 +46,7 @@ mod erc1400 {
                 balance_of_partition: StorageHashMap::new(),
                 owner: Lazy::new(caller),
                 authorized_operator: StorageHashMap::new(),
-                controllers: StorageHashMap::new(),
+                controllers,
                 allow_by_partition: StorageHashMap::new(),
                 authorized_operator_by_partition: StorageHashMap::new(),
                 controllers_by_partition: StorageHashMap::new()
@@ -67,22 +69,26 @@ mod erc1400 {
         }
 
         #[ink(message)]
-        pub fn issue_by_partition(&mut self, partition: Hash, amount: Balance) {
+        pub fn issue_by_partition(&mut self, partition: Hash, amount: Balance) -> Result<(), Error> {
             let caller = self.env().caller();
+            if self.is_controllable() {
+                self.total_supply += amount;
 
-            self.total_supply += amount;
+                let balance = self.balance_of(caller);
+                self.balances.insert(caller, balance + amount);
 
-            let balance = self.balance_of(caller);
-            self.balances.insert(caller, balance + amount);
-
-            if self.is_partition(partition) == false {
-                self.total_paritions.push(partition);
-                let mut own_partition: Vec<Hash> = Vec::new();
-                own_partition.push(partition);
-                self.partitions_of.insert(caller, own_partition);
-            };
-            let p_balance = self.balance_of_partition.get(&(caller, partition)).copied().unwrap_or(0);
-            self.balance_of_partition.insert((caller, partition), amount + p_balance);
+                if self.is_partition(partition) == false {
+                    self.total_paritions.push(partition);
+                    let mut own_partition: Vec<Hash> = Vec::new();
+                    own_partition.push(partition);
+                    self.partitions_of.insert(caller, own_partition);
+                };
+                let p_balance = self.balance_of_partition.get(&(caller, partition)).copied().unwrap_or(0);
+                self.balance_of_partition.insert((caller, partition), amount + p_balance);
+                Ok(())
+            }else {
+                Err(Error::NotAllowed)
+            }
         }
 
         #[ink(message)]
