@@ -3,7 +3,6 @@ symbol: symbol of security token
 total_supply: total token of all partition
 total_supply_by_partition: total token of that partition
 balance: total balance of token holder from all partition
-allow: specific amount that token holder can hold
 documents: list of docments
 total_paritions: list of all partition in contract
 owner: own of contract

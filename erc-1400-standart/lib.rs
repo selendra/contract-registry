@@ -29,6 +29,7 @@ mod erc1400 {
     }
 
     impl Erc1400 {
+        /// deploy new contract with symbol of token
         #[ink(constructor)]
         pub fn new(token_symbol: String) -> Self {
             let caller = Self::env().caller();
@@ -53,31 +54,37 @@ mod erc1400 {
             }
         }
 
+        ///get total amount of token
         #[ink(message)]
         pub fn total_supply(&self) -> Balance {
             self.total_supply
         }
 
+        ///get total amont in specific partition
         #[ink(message)]
         pub fn total_supply_by_partition(&self, partition: Hash) -> Balance {
             self.total_supply_by_partition.get(&partition).copied().unwrap_or(0)
         }
 
+        ///get total balance of token_holder
         #[ink(message)]
         pub fn balance_of(&self, token_holder: AccountId) -> Balance {
             self.balances.get(&token_holder).copied().unwrap_or(0)
         }
 
+        ///get get total balance of token_holder from specific partition
         #[ink(message)]
         pub fn balance_of_by_partition(&self, token_holder: AccountId, partition: Hash) -> Balance {
             self.balance_of_partition.get(&(token_holder, partition)).copied().unwrap_or(0)
         }
 
+        ///get list of total partition
         #[ink(message)]
         pub fn list_of_partition(&self) -> Vec<Hash> {
             self.total_paritions.clone()
         }
 
+        ///get list of total partition of each token_holder
         #[ink(message)]
         pub fn partion_of_token_holder(&self, token_holder: AccountId) -> Vec<Hash>{
             match self.partitions_of.get(&token_holder) {
@@ -88,11 +95,57 @@ mod erc1400 {
             }
         }
 
+        ///get symbol of token
         #[ink(message)]
         pub fn symbol(&self) -> String {
             self.symbol.clone()
         }
 
+        ///input user that can controller over all partition
+        #[ink(message)]
+        pub fn set_controller(&mut self, controller: AccountId) -> Result<(), Error> {
+            if self.only_owner() {
+                self.controllers.insert(controller, true);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+        ///input user that can controller over specific partition
+        #[ink(message)]
+        pub fn set_controller_by_partition(&mut self,controller: AccountId, partition: Hash) -> Result<(), Error> {
+            if self.only_owner() {
+                self.controllers_by_partition.insert((controller, partition), true);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+        ///remove user permission of controller from control over all partition
+        #[ink(message)]
+        pub fn renounce_controller(&mut self, controller: AccountId) -> Result<(), Error> {
+            if self.only_owner() {
+                self.controllers.insert(controller, false);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+        ///remove user permission of controller from control over specific partition
+        #[ink(message)]
+        pub fn renounce_controller_by_partitons(&mut self, controller: AccountId, partition: Hash) -> Result<(), Error> {
+            if self.only_owner() {
+                self.controllers_by_partition.insert((controller, partition), false);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+        ///issue new amount of token in each permission
         #[ink(message)]
         pub fn issue_by_partition(&mut self, partition: Hash, amount: Balance) -> Result<(), Error> {
             let caller = self.env().caller();
@@ -119,26 +172,7 @@ mod erc1400 {
             }
         }
 
-        #[ink(message)]
-        pub fn set_controller(&mut self, controller: AccountId) -> Result<(), Error> {
-            if self.only_owner() {
-                self.controllers.insert(controller, true);
-                Ok(())
-            }else {
-                return  Err(Error::NotAllowed);
-            }
-        }
-
-        #[ink(message)]
-        pub fn set_controller_by_partition(&mut self,controller: AccountId, partition: Hash) -> Result<(), Error> {
-            if self.only_owner() {
-                self.controllers_by_partition.insert((controller, partition), true);
-                Ok(())
-            }else {
-                return  Err(Error::NotAllowed);
-            }
-        }
-
+        ///input user that can any amount of token in any partition
         #[ink(message)]
         pub fn set_authorized_operator(&mut self, authorized: AccountId) -> Result<(), Error> {
             if self.only_owner() || self.is_controller() {
@@ -149,6 +183,7 @@ mod erc1400 {
             }
         }
 
+        ///input user that can any amount of token in specific partition
         #[ink(message)]
         pub fn set_authorized_operator_by_partition(&mut self, authorized: AccountId, partition: Hash) -> Result<(), Error> {
             if self.only_owner() || self.is_controller() || self.is_controller_by_partition(partition){
@@ -159,6 +194,7 @@ mod erc1400 {
             }
         }
 
+        ///input amount of token that user can hold in each partition
         #[ink(message)]
         pub fn set_allow_amount_by_partition(&mut self, user: AccountId, partition: Hash, amount: Balance) -> Result<(), Error> {
             if self.only_owner() || self.is_controller() || self.is_controller_by_partition(partition) {
@@ -169,31 +205,13 @@ mod erc1400 {
             }
         }
 
+        ///get amount of token that can hold
         #[ink(message)]
         pub fn get_allowed_amout(&self, token_holder: AccountId, partition: Hash) -> Balance {
             self.allow_by_partition.get(&(token_holder,partition)).copied().unwrap_or(0)
         }
 
-        #[ink(message)]
-        pub fn renounce_controller(&mut self, controller: AccountId) -> Result<(), Error> {
-            if self.only_owner() {
-                self.controllers.insert(controller, false);
-                Ok(())
-            }else {
-                return  Err(Error::NotAllowed);
-            }
-        }
-
-        #[ink(message)]
-        pub fn renounce_controller_by_partitons(&mut self, controller: AccountId, partition: Hash) -> Result<(), Error> {
-            if self.only_owner() {
-                self.controllers_by_partition.insert((controller, partition), false);
-                Ok(())
-            }else {
-                return  Err(Error::NotAllowed);
-            }
-        }
-
+        ///remove permission to hold any amount token
         #[ink(message)]
         pub fn renounce_authorized_operator(&mut self, authorized: AccountId) -> Result<(), Error> {
             if self.only_owner() || self.is_controller() {
@@ -204,7 +222,7 @@ mod erc1400 {
             }
         }
 
-
+       ///remove permission to hold any amount token in specific partition
         #[ink(message)]
         pub fn renounce_authorized_operator_by_partitons(&mut self, authorized: AccountId, partition: Hash) -> Result<(), Error> {
             if self.only_owner() || self.is_controller() || self.is_controller_by_partition(partition) {
@@ -215,6 +233,7 @@ mod erc1400 {
             }
         }
 
+        ///transfer token to any token_holder that allow to hold
         #[ink(message)]
         pub fn transfer(&mut self, to: AccountId, partition: Hash, amount: Balance) -> Result<(), Error>{
             let caller = self.env().caller();
