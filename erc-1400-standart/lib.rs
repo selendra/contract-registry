@@ -23,7 +23,6 @@ mod erc1400 {
         owner: Lazy<AccountId>,
         authorized_operator: StorageHashMap<AccountId, bool>,
         controllers: StorageHashMap<AccountId, bool>,
-        allow: StorageHashMap<AccountId, Balance>,
         allow_by_partition: StorageHashMap<(AccountId, Hash), Balance >,
         authorized_operator_by_partition: StorageHashMap<(AccountId, Hash), bool>,
         controllers_by_partition: StorageHashMap<(AccountId, Hash), bool>
@@ -41,7 +40,6 @@ mod erc1400 {
                 total_supply: 0,
                 total_supply_by_partition: StorageHashMap::new(),
                 balances: StorageHashMap::new(),
-                allow: StorageHashMap::new(),
                 documents: Vec::new(),
                 total_paritions: Vec::new(),
                 partitions_of: StorageHashMap::new(),
@@ -132,29 +130,19 @@ mod erc1400 {
         }
 
         #[ink(message)]
-        pub fn set_allow_user(&mut self, user: AccountId, amount: Balance) -> Result<(), Error> {
-            if self.only_owner() || self.is_controller() {
-                self.allow.insert(user, amount);
-                Ok(())
-            }else {
-                return  Err(Error::NotAllowed);
-            }
-        }
-
-        #[ink(message)]
-        pub fn set_allow_user_by_partition(&mut self, user: AccountId, partition: Hash, amount: Balance) -> Result<(), Error> {
-            if self.only_owner() || self.is_controller() || self.is_controller_by_partition(partition) {
-                self.allow_by_partition.insert((user, partition), amount);
-                Ok(())
-            }else {
-                return  Err(Error::NotAllowed);
-            }
-        }
-
-        #[ink(message)]
         pub fn set_controller_by_partition(&mut self,controller: AccountId, partition: Hash) -> Result<(), Error> {
             if self.only_owner() {
                 self.controllers_by_partition.insert((controller, partition), true);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+        #[ink(message)]
+        pub fn set_allow_value_by_partition(&mut self, user: AccountId, partition: Hash, amount: Balance) -> Result<(), Error> {
+            if self.only_owner() || self.is_controller() || self.is_controller_by_partition(partition) {
+                self.allow_by_partition.insert((user, partition), amount);
                 Ok(())
             }else {
                 return  Err(Error::NotAllowed);
@@ -180,7 +168,6 @@ mod erc1400 {
                 return  Err(Error::NotAllowed);
             }
         }
-
 
         #[ink(message)]
         pub fn transfer(&mut self, to: AccountId, partition: Hash, amount: Balance) -> Result<(), Error>{
