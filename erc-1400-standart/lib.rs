@@ -72,7 +72,7 @@ mod erc1400 {
             self.balances.get(&token_holder).copied().unwrap_or(0)
         }
 
-        ///get get total balance of token_holder from specific partition
+        ///get total balance of token_holder from specific partition
         #[ink(message)]
         pub fn balance_of_by_partition(&self, token_holder: AccountId, partition: Hash) -> Balance {
             self.balance_of_partition.get(&(token_holder, partition)).copied().unwrap_or(0)
@@ -167,7 +167,7 @@ mod erc1400 {
         #[ink(message)]
         pub fn issue_by_partition(&mut self, partition: Hash, amount: Balance) -> Result<(), Error> {
             let caller = self.env().caller();
-            if self.is_issueable(partition) {
+            if self.is_issue_redeem_able(partition) {
                 self.total_supply += amount;
 
                 let tpb = self.total_supply_by_partition(partition);
@@ -231,7 +231,7 @@ mod erc1400 {
 
         ///remove permission to hold any amount token
         #[ink(message)]
-        pub fn renounce_authorized_operator(&mut self, authorized: AccountId) -> Result<(), Error> {
+        pub fn revoke_authorized_operator(&mut self, authorized: AccountId) -> Result<(), Error> {
             if self.only_owner() || self.is_controller() {
                 self.authorized_operator.insert(authorized, false);
                 Ok(())
@@ -242,7 +242,7 @@ mod erc1400 {
 
        ///remove permission to hold any amount token in specific partition
         #[ink(message)]
-        pub fn renounce_authorized_operator_by_partitons(&mut self, authorized: AccountId, partition: Hash) -> Result<(), Error> {
+        pub fn revoke_authorized_operator_by_partitons(&mut self, authorized: AccountId, partition: Hash) -> Result<(), Error> {
             if self.only_owner() || self.is_controller() || self.is_controller_by_partition(partition) {
                 self.authorized_operator_by_partition.insert((authorized, partition), false);
                 Ok(())
@@ -261,10 +261,48 @@ mod erc1400 {
             }else {
                 Err(Error::NotAllowed)
             }
-           
         }
 
-        fn is_issueable(&self, partition: Hash) -> bool {
+        ///redeem token from token_holder
+        #[ink(message)]
+        pub fn redeem(&mut self, token_holder: AccountId, partition: Hash, amount: Balance) -> Result<(), Error> {
+            if self.is_issue_redeem_able(partition) || token_holder != *self.owner {
+                let caller = self.env().caller();
+                self.redeem_from(caller, token_holder, amount);
+                self.redeem_by_partition(caller, token_holder, partition, amount);
+                Ok(())
+            }else {
+                Err(Error::NotAllowed)
+            }
+        }
+
+        fn redeem_from(&mut self, caller: AccountId, token_holder: AccountId, amount: Balance){
+            let balances = self.balance_of(token_holder);
+
+            if balances < amount {
+                self.balances.insert(token_holder, 0);
+            }else {
+                self.balances.insert(token_holder, balances - amount);
+            }
+
+            let c_balance = self.balance_of(caller);
+            self.balances.insert(caller, c_balance + amount);
+        }
+
+        fn redeem_by_partition(&mut self, caller: AccountId, token_holder: AccountId, partition: Hash, amount: Balance) {
+            let p_balance = self.balance_of_by_partition(token_holder, partition);
+
+            if p_balance < amount {
+                self.balance_of_partition.insert((token_holder, partition), 0);
+            }else {
+                self.balance_of_partition.insert((token_holder, partition), p_balance - amount);
+            }
+
+            let cp_balance = self.balance_of_by_partition(token_holder, partition);
+            self.balance_of_partition.insert((caller, partition), cp_balance + amount);
+        }
+        
+        fn is_issue_redeem_able(&self, partition: Hash) -> bool {
             if self.only_owner() || self.is_controller() || self.is_controller_by_partition(partition) {
                 true
             }else {
@@ -315,7 +353,7 @@ mod erc1400 {
             self.authorized_operator_by_partition.get(&(caller, partition)).copied().unwrap_or(false)
         }
 
-        fn transfer_from_to(&mut self,from: AccountId, to: AccountId, partition: Hash,  amount: Balance) -> Result<(), Error> {
+        fn transfer_from_to(&mut self, from: AccountId, to: AccountId, partition: Hash,  amount: Balance) -> Result<(), Error> {
             let from_balannce = self.balance_of_by_partition(from, partition);
             if from_balannce < amount {
                 return Err(Error::InsufficientBalance);
