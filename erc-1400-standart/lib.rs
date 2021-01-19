@@ -140,13 +140,18 @@ mod erc1400 {
         }
 
         #[ink(message)]
-        pub fn set_allow_value_by_partition(&mut self, user: AccountId, partition: Hash, amount: Balance) -> Result<(), Error> {
+        pub fn set_allow_amount_by_partition(&mut self, user: AccountId, partition: Hash, amount: Balance) -> Result<(), Error> {
             if self.only_owner() || self.is_controller() || self.is_controller_by_partition(partition) {
                 self.allow_by_partition.insert((user, partition), amount);
                 Ok(())
             }else {
                 return  Err(Error::NotAllowed);
             }
+        }
+
+        #[ink(message)]
+        pub fn get_allowed_amout(&self, token_holder: AccountId, partition: Hash) -> Balance {
+            self.allow_by_partition.get(&(token_holder,partition)).copied().unwrap_or(0)
         }
 
         #[ink(message)]
@@ -172,20 +177,38 @@ mod erc1400 {
         #[ink(message)]
         pub fn transfer(&mut self, to: AccountId, partition: Hash, amount: Balance) -> Result<(), Error>{
             let caller = self.env().caller();
-            self.transfer_from_to(caller, to,partition, amount)?;
-            Ok(())
+            if self.is_allowed(to, partition, amount) {
+                self.transfer_from_to(caller, to,partition, amount)?;
+                Ok(())
+            }else {
+                Err(Error::NotAllowed)
+            }
+           
         }
 
         fn is_issueable(&self, partition: Hash) -> bool {
-            if self.only_owner() {
-                true
-            }else if self.is_controller() {
-                true
-            }else if self.is_controller_by_partition(partition) {
+            if self.only_owner() || self.is_controller() || self.is_controller_by_partition(partition) {
                 true
             }else {
                 false
             }
+        }
+
+        fn is_allowed(&self, token_holder: AccountId, partition: Hash, amount: Balance) -> bool {
+            if self.only_owner() || 
+               self.is_controller() || 
+               self.is_controller_by_partition(partition) 
+            {
+                true
+            }else {
+                let alow_balance = self.get_allowed_amout(token_holder, partition);
+                if alow_balance < amount {
+                    false
+                }else {
+                    true
+                }
+            }
+            
         }
 
         fn is_controller_by_partition(&self, partition: Hash) -> bool {
