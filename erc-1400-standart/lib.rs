@@ -16,7 +16,6 @@ mod erc1400 {
         total_supply: Balance,
         total_supply_by_partition: StorageHashMap<Hash, Balance>,
         balances: StorageHashMap<AccountId, Balance>,
-        allow: StorageHashMap<AccountId, Balance>,
         documents: Vec<Document>,
         total_paritions: Vec<Hash>,
         partitions_of: StorageHashMap<AccountId, Vec<Hash>>,
@@ -24,6 +23,7 @@ mod erc1400 {
         owner: Lazy<AccountId>,
         authorized_operator: StorageHashMap<AccountId, bool>,
         controllers: StorageHashMap<AccountId, bool>,
+        allow: StorageHashMap<AccountId, Balance>,
         allow_by_partition: StorageHashMap<(AccountId, Hash), Balance >,
         authorized_operator_by_partition: StorageHashMap<(AccountId, Hash), bool>,
         controllers_by_partition: StorageHashMap<(AccountId, Hash), bool>
@@ -132,6 +132,26 @@ mod erc1400 {
         }
 
         #[ink(message)]
+        pub fn set_allow_user(&mut self, user: AccountId, amount: Balance) -> Result<(), Error> {
+            if self.only_owner() || self.is_controller() {
+                self.allow.insert(user, amount);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+        #[ink(message)]
+        pub fn set_allow_user_by_partition(&mut self, user: AccountId, partition: Hash, amount: Balance) -> Result<(), Error> {
+            if self.only_owner() || self.is_controller() || self.is_controller_by_partition(partition) {
+                self.allow_by_partition.insert((user, partition), amount);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+        #[ink(message)]
         pub fn set_controller_by_partition(&mut self,controller: AccountId, partition: Hash) -> Result<(), Error> {
             if self.only_owner() {
                 self.controllers_by_partition.insert((controller, partition), true);
@@ -181,6 +201,11 @@ mod erc1400 {
             }
         }
 
+        fn is_controller_by_partition(&self, partition: Hash) -> bool {
+            let caller = self.env().caller();
+            self.controllers_by_partition.get(&(caller, partition)).copied().unwrap_or(false)
+        }
+
         fn is_partition(&self, partition: Hash) -> bool {
             self.total_paritions.contains(&partition)
         }
@@ -207,11 +232,6 @@ mod erc1400 {
             self.balance_of_partition.insert((to, partition), to_balannce + amount);
 
             Ok(())
-        }
-
-        fn is_controller_by_partition(&self, partition: Hash) -> bool {
-            let caller = self.env().caller();
-            self.controllers_by_partition.get(&(caller, partition)).copied().unwrap_or(false)
         }
 
         pub fn only_owner(&self) -> bool {
