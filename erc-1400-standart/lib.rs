@@ -101,6 +101,24 @@ mod erc1400 {
             self.symbol.clone()
         }
 
+        ///get document
+        #[ink(message)]
+        pub fn get_document(&self) -> Vec<Document> {
+            self.documents.clone()
+        }
+
+        ///insert document uri and docment hash
+        #[ink(message)]
+        pub fn set_document(&mut self, document_hash: Hash, document_uri: String) -> Result<(), Error> {
+            if self.only_owner() {
+                let doc = Document{ doc_hash: document_hash, doc_uri: document_uri };
+                self.documents.push(doc);
+                Ok(())
+            }else {
+                Err(Error::NotAllowed)
+            }
+        }
+
         ///input user that can controller over all partition
         #[ink(message)]
         pub fn set_controller(&mut self, controller: AccountId) -> Result<(), Error> {
@@ -108,7 +126,7 @@ mod erc1400 {
                 self.controllers.insert(controller, true);
                 Ok(())
             }else {
-                return  Err(Error::NotAllowed);
+                Err(Error::NotAllowed)
             }
         }
 
