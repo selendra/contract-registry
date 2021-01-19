@@ -35,7 +35,7 @@ mod erc1400 {
             let mut controllers = StorageHashMap::new();
             controllers.insert(caller, true);
 
-            Self { 
+            Self {
                 symbol: token_symbol,
                 total_supply: 0,
                 total_supply_by_partition: StorageHashMap::new(),
@@ -140,6 +140,26 @@ mod erc1400 {
         }
 
         #[ink(message)]
+        pub fn set_authorized_operator(&mut self, authorized: AccountId) -> Result<(), Error> {
+            if self.only_owner() || self.is_controller() {
+                self.authorized_operator.insert(authorized, true);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+        #[ink(message)]
+        pub fn set_authorized_operator_by_partition(&mut self, authorized: AccountId, partition: Hash) -> Result<(), Error> {
+            if self.only_owner() || self.is_controller() || self.is_controller_by_partition(partition){
+                self.authorized_operator_by_partition.insert((authorized, partition), true);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+        #[ink(message)]
         pub fn set_allow_amount_by_partition(&mut self, user: AccountId, partition: Hash, amount: Balance) -> Result<(), Error> {
             if self.only_owner() || self.is_controller() || self.is_controller_by_partition(partition) {
                 self.allow_by_partition.insert((user, partition), amount);
@@ -165,9 +185,30 @@ mod erc1400 {
         }
 
         #[ink(message)]
-        pub fn renounce_controller_by_partitons(&mut self,controller: AccountId, partition: Hash) -> Result<(), Error> {
+        pub fn renounce_controller_by_partitons(&mut self, controller: AccountId, partition: Hash) -> Result<(), Error> {
             if self.only_owner() {
                 self.controllers_by_partition.insert((controller, partition), false);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+        #[ink(message)]
+        pub fn renounce_authorized_operator(&mut self, authorized: AccountId) -> Result<(), Error> {
+            if self.only_owner() || self.is_controller() {
+                self.authorized_operator.insert(authorized, false);
+                Ok(())
+            }else {
+                return  Err(Error::NotAllowed);
+            }
+        }
+
+
+        #[ink(message)]
+        pub fn renounce_authorized_operator_by_partitons(&mut self, authorized: AccountId, partition: Hash) -> Result<(), Error> {
+            if self.only_owner() || self.is_controller() || self.is_controller_by_partition(partition) {
+                self.authorized_operator_by_partition.insert((authorized, partition), false);
                 Ok(())
             }else {
                 return  Err(Error::NotAllowed);
@@ -197,7 +238,9 @@ mod erc1400 {
         fn is_allowed(&self, token_holder: AccountId, partition: Hash, amount: Balance) -> bool {
             if self.only_owner() || 
                self.is_controller() || 
-               self.is_controller_by_partition(partition) 
+               self.is_controller_by_partition(partition) ||
+               self.is_authorized_operator() || 
+               self.is_authorized_operator_by_partition(partition)
             {
                 true
             }else {
@@ -211,18 +254,28 @@ mod erc1400 {
             
         }
 
+        fn is_partition(&self, partition: Hash) -> bool {
+            self.total_paritions.contains(&partition)
+        }
+
         fn is_controller_by_partition(&self, partition: Hash) -> bool {
             let caller = self.env().caller();
             self.controllers_by_partition.get(&(caller, partition)).copied().unwrap_or(false)
         }
 
-        fn is_partition(&self, partition: Hash) -> bool {
-            self.total_paritions.contains(&partition)
-        }
-
         fn is_controller(&self) -> bool {
             let caller = self.env().caller();
             self.controllers.get(&caller).copied().unwrap_or(false)
+        }
+
+        fn is_authorized_operator(&self) -> bool {
+            let caller = self.env().caller();
+            self.authorized_operator.get(&caller).copied().unwrap_or(false)
+        }
+
+        fn is_authorized_operator_by_partition(&self, partition: Hash) -> bool {
+            let caller = self.env().caller();
+            self.authorized_operator_by_partition.get(&(caller, partition)).copied().unwrap_or(false)
         }
 
         fn transfer_from_to(&mut self,from: AccountId, to: AccountId, partition: Hash,  amount: Balance) -> Result<(), Error> {
