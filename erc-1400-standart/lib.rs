@@ -107,6 +107,14 @@ mod erc1400 {
             self.documents.clone()
         }
 
+        ///transfer ownership 
+        #[ink(message)]
+        pub fn transfer_ownership(&mut self, to: AccountId) {
+            if self.only_owner() {
+                *self.owner = to;
+            }
+        }
+
         ///insert document uri and docment hash
         #[ink(message)]
         pub fn set_document(&mut self, document_hash: Hash, document_uri: String) -> Result<(), Error> {
