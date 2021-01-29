@@ -25,7 +25,8 @@ mod erc1400 {
         controllers: StorageHashMap<AccountId, bool>,
         allow_by_partition: StorageHashMap<(AccountId, Hash), Balance >,
         authorized_operator_by_partition: StorageHashMap<(AccountId, Hash), bool>,
-        controllers_by_partition: StorageHashMap<(AccountId, Hash), bool>
+        controllers_by_partition: StorageHashMap<(AccountId, Hash), bool>,
+        issueable: bool,
     }
 
     impl Erc1400 {
@@ -50,7 +51,8 @@ mod erc1400 {
                 controllers,
                 allow_by_partition: StorageHashMap::new(),
                 authorized_operator_by_partition: StorageHashMap::new(),
-                controllers_by_partition: StorageHashMap::new()
+                controllers_by_partition: StorageHashMap::new(),
+                issueable: true,
             }
         }
 
@@ -105,6 +107,14 @@ mod erc1400 {
         #[ink(message)]
         pub fn get_document(&self) -> Vec<Document> {
             self.documents.clone()
+        }
+
+        ///set issueable token
+        #[ink(message)]
+        pub fn issueable(&mut self, can: bool) {
+            if self.only_owner() {
+                self.issueable = can;
+            }
         }
 
         ///transfer ownership 
@@ -175,7 +185,9 @@ mod erc1400 {
         #[ink(message)]
         pub fn issue_by_partition(&mut self, partition: Hash, amount: Balance) -> Result<(), Error> {
             let caller = self.env().caller();
-            if self.is_issue_redeem_able(partition) {
+            if self.issueable == false {
+                Err(Error::NotAllowed)
+            }else if self.is_issue_redeem_able(partition) {
                 self.total_supply += amount;
 
                 let tpb = self.total_supply_by_partition(partition);
