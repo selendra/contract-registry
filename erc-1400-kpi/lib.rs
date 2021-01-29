@@ -138,8 +138,9 @@ mod erc1400 {
         #[ink(message)]
         pub fn set_controller_by_partition(&mut self,controller: AccountId, partition: Hash) -> Result<(), Error> {
             if self.only_owner() {
-                if self.is_controller_by_partition(partition) == false {
+                if self.is_exit_partition(partition) == false {
                     self.controllers.insert((controller, partition), true);
+                    self.total_paritions.push(partition);
                     Ok(())
                 }else {
                     return Err(Error::NotAllowed);
@@ -161,7 +162,6 @@ mod erc1400 {
                     let balance = self.balance_of(caller);
                     self.balances.insert(caller, balance + amount);
 
-                    self.total_paritions.push(partition);
                     let mut own_partition = self.partion_of_token_holder(caller);
                     own_partition.push(partition);
                     self.partitions_of.insert(caller, own_partition);
