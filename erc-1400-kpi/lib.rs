@@ -24,6 +24,7 @@ mod erc1400 {
         allow_by_partition: StorageHashMap<(AccountId, Hash), Balance >,
         authorized_operator: StorageHashMap<(AccountId, Hash), bool>,
         controllers: StorageHashMap<(AccountId, Hash), bool>,
+        is_issuable: StorageHashMap<Hash, bool>,
     }
 
     impl Erc1400 {
@@ -44,7 +45,8 @@ mod erc1400 {
                 owner: Lazy::new(caller),
                 controllers: StorageHashMap::new(),
                 allow_by_partition: StorageHashMap::new(),
-                authorized_operator: StorageHashMap::new()
+                authorized_operator: StorageHashMap::new(),
+                is_issuable: StorageHashMap::new(),
             }
         }
 
@@ -141,6 +143,7 @@ mod erc1400 {
                 if self.is_exit_partition(partition) == false {
                     self.controllers.insert((controller, partition), true);
                     self.total_paritions.push(partition);
+                    self.is_issuable.insert(partition, true);
                     Ok(())
                 }else {
                     return Err(Error::NotAllowed);
@@ -154,18 +157,19 @@ mod erc1400 {
         #[ink(message)]
         pub fn issue_by_partition(&mut self, partition: Hash, amount: Balance) -> Result<(), Error> {
             let caller = self.env().caller();
-            if self.is_controller_by_partition(partition) {
-                if self.is_exit_partition(partition) == false {
-                    self.total_supply += amount;
-                    self.total_supply_by_partition.insert(partition, amount);
+            if self.is_controller_by_partition(partition) && self.is_issuable(partition) {
+                self.total_supply += amount;
+                self.total_supply_by_partition.insert(partition, amount);
 
-                    let balance = self.balance_of(caller);
-                    self.balances.insert(caller, balance + amount);
+                let balance = self.balance_of(caller);
+                self.balances.insert(caller, balance + amount);
 
-                    let mut own_partition = self.partion_of_token_holder(caller);
-                    own_partition.push(partition);
-                    self.partitions_of.insert(caller, own_partition);
-                };
+                self.balance_of_partition.insert((caller, partition), amount);
+
+                let mut own_partition = self.partion_of_token_holder(caller);
+                own_partition.push(partition);
+                self.partitions_of.insert(caller, own_partition);
+                self.is_issuable.insert(partition, false);
                 Ok(())
             }else {
                 Err(Error::NotAllowed)
@@ -267,6 +271,10 @@ mod erc1400 {
             
         }
 
+        fn is_issuable(&self, partition: Hash) -> bool {
+            self.is_issuable.get(&partition).copied().unwrap_or(false)
+        }
+
         fn is_exit_partition(&self, partition: Hash) -> bool {
             self.total_paritions.contains(&partition)
         }
@@ -292,7 +300,7 @@ mod erc1400 {
             self.balances.insert(from, from_balances - amount);
 
             let to_balances = self.balance_of(to);
-            self.balances.insert(to, to_balances+ amount);
+            self.balances.insert(to, to_balances + amount);
 
             let to_balannce = self.balance_of_by_partition(to, partition);
             self.balance_of_partition.insert((to, partition), to_balannce + amount);
