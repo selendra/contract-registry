@@ -12,7 +12,8 @@ mod erc1400 {
 
     #[ink(storage)]
     pub struct Erc1400 {
-        symbol: String,
+        symbol: Vec<String>,
+        partition_symbol: StorageHashMap<String, Hash>,
         total_supply: Balance,
         total_supply_by_partition: StorageHashMap<Hash, Balance>,
         balances: StorageHashMap<AccountId, Balance>,
@@ -30,11 +31,12 @@ mod erc1400 {
     impl Erc1400 {
         /// deploy new contract with symbol of token
         #[ink(constructor)]
-        pub fn new(token_symbol: String) -> Self {
+        pub fn new() -> Self {
             let caller = Self::env().caller();
 
             Self {
-                symbol: token_symbol,
+                symbol: Vec::new(),
+                partition_symbol: StorageHashMap::new(),
                 total_supply: 0,
                 total_supply_by_partition: StorageHashMap::new(),
                 balances: StorageHashMap::new(),
@@ -101,8 +103,14 @@ mod erc1400 {
 
         ///get symbol of token
         #[ink(message)]
-        pub fn symbol(&self) -> String {
+        pub fn symbol(&self) -> Vec<String> {
             self.symbol.clone()
+        }
+
+        #[ink(message)]
+        pub fn get_hash_by_symbol(&self, symbol: String) -> Hash {
+            let hash = Hash::from([0; 32]);
+            self.partition_symbol.get(&symbol).copied().unwrap_or(hash)
         }
 
         ///get document
@@ -138,12 +146,14 @@ mod erc1400 {
 
         ///input user that can controller over specific partition
         #[ink(message)]
-        pub fn set_controller_by_partition(&mut self,controller: AccountId, partition: Hash) -> Result<(), Error> {
+        pub fn set_controller_by_partition(&mut self,controller: AccountId, symbol: String, partition: Hash) -> Result<(), Error> {
             if self.only_owner() {
                 if self.is_exit_partition(partition) == false {
                     self.controllers.insert((controller, partition), true);
                     self.total_paritions.push(partition);
                     self.is_issuable.insert(partition, true);
+                    self.symbol.push(symbol.clone());
+                    self.partition_symbol.insert(symbol.clone(), partition);
                     Ok(())
                 }else {
                     return Err(Error::NotAllowed);
