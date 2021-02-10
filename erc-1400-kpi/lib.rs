@@ -16,7 +16,6 @@ mod erc1400 {
         partition_symbol: StorageHashMap<String, Hash>,
         total_supply: Balance,
         total_supply_by_partition: StorageHashMap<Hash, Balance>,
-        balances: StorageHashMap<AccountId, Balance>,
         documents: StorageHashMap<Hash, Vec<Document>>,
         total_paritions: Vec<Hash>,
         partitions_of: StorageHashMap<AccountId, Vec<Hash>>,
@@ -39,7 +38,6 @@ mod erc1400 {
                 partition_symbol: StorageHashMap::new(),
                 total_supply: 0,
                 total_supply_by_partition: StorageHashMap::new(),
-                balances: StorageHashMap::new(),
                 documents: StorageHashMap::new(),
                 total_paritions: Vec::new(),
                 partitions_of: StorageHashMap::new(),
@@ -70,12 +68,6 @@ mod erc1400 {
         #[ink(message)]
         pub fn total_supply_by_partition(&self, partition: Hash) -> Balance {
             self.total_supply_by_partition.get(&partition).copied().unwrap_or(0)
-        }
-
-        ///get total balance of token_holder
-        #[ink(message)]
-        pub fn balance_of(&self, token_holder: AccountId) -> Balance {
-            self.balances.get(&token_holder).copied().unwrap_or(0)
         }
 
         ///get total balance of token_holder from specific partition
@@ -171,9 +163,6 @@ mod erc1400 {
                 self.total_supply += amount;
                 self.total_supply_by_partition.insert(partition, amount);
 
-                let balance = self.balance_of(caller);
-                self.balances.insert(caller, balance + amount);
-
                 self.balance_of_partition.insert((caller, partition), amount);
 
                 let mut own_partition = self.partion_of_token_holder(caller);
@@ -244,27 +233,17 @@ mod erc1400 {
         }
 
         fn redeem(&mut self, caller: AccountId, token_holder: AccountId, amount: Balance, partition: Hash){
-            let balances = self.balance_of(token_holder);
 
-            if balances < amount {
-                self.balances.insert(token_holder, 0);
-            }else {
-                self.balances.insert(token_holder, balances - amount);
-            }
+            let balance = self.balance_of_by_partition(token_holder, partition);
 
-            let c_balance = self.balance_of(caller);
-            self.balances.insert(caller, c_balance + amount);
-
-            let p_balance = self.balance_of_by_partition(token_holder, partition);
-
-            if p_balance < amount {
+            if balance < amount {
                 self.balance_of_partition.insert((token_holder, partition), 0);
             }else {
-                self.balance_of_partition.insert((token_holder, partition), p_balance - amount);
+                self.balance_of_partition.insert((token_holder, partition), balance - amount);
             }
 
-            let cp_balance = self.balance_of_by_partition(token_holder, partition);
-            self.balance_of_partition.insert((caller, partition), cp_balance + amount);
+            let balance = self.balance_of_by_partition(token_holder, partition);
+            self.balance_of_partition.insert((caller, partition), balance + amount);
         }
 
         fn is_allowed(&self, token_holder: AccountId, partition: Hash, amount: Balance) -> bool {
@@ -305,12 +284,6 @@ mod erc1400 {
                 return Err(Error::InsufficientBalance);
             }
             self.balance_of_partition.insert((from, partition), from_balannce - amount);
-
-            let from_balances = self.balance_of(from);
-            self.balances.insert(from, from_balances - amount);
-
-            let to_balances = self.balance_of(to);
-            self.balances.insert(to, to_balances + amount);
 
             let to_balannce = self.balance_of_by_partition(to, partition);
             self.balance_of_partition.insert((to, partition), to_balannce + amount);
