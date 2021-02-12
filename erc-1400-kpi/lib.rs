@@ -13,16 +13,15 @@ mod erc1400 {
     #[ink(storage)]
     pub struct Erc1400 {
         symbol: Vec<String>,
+        list_paritions: Vec<Hash>,
         partition_symbol: StorageHashMap<String, Hash>,
         total_supply: Balance,
         total_supply_by_partition: StorageHashMap<Hash, Balance>,
         documents: StorageHashMap<Hash, Vec<Document>>,
-        total_paritions: Vec<Hash>,
         partitions_of: StorageHashMap<AccountId, Vec<Hash>>,
         balance_of_partition: StorageHashMap<(AccountId, Hash), Balance >,
         owner: Lazy<AccountId>,
         allow_by_partition: StorageHashMap<(AccountId, Hash), Balance >,
-        authorized_operator: StorageHashMap<(AccountId, Hash), bool>,
         controllers: StorageHashMap<(AccountId, Hash), bool>,
         is_issuable: StorageHashMap<Hash, bool>,
     }
@@ -39,13 +38,12 @@ mod erc1400 {
                 total_supply: 0,
                 total_supply_by_partition: StorageHashMap::new(),
                 documents: StorageHashMap::new(),
-                total_paritions: Vec::new(),
+                list_paritions: Vec::new(),
                 partitions_of: StorageHashMap::new(),
                 balance_of_partition: StorageHashMap::new(),
                 owner: Lazy::new(caller),
                 controllers: StorageHashMap::new(),
                 allow_by_partition: StorageHashMap::new(),
-                authorized_operator: StorageHashMap::new(),
                 is_issuable: StorageHashMap::new(),
             }
         }
@@ -74,12 +72,6 @@ mod erc1400 {
         #[ink(message)]
         pub fn balance_of_by_partition(&self, token_holder: AccountId, partition: Hash) -> Balance {
             self.balance_of_partition.get(&(token_holder, partition)).copied().unwrap_or(0)
-        }
-
-        ///get list of total partition
-        #[ink(message)]
-        pub fn list_of_partition(&self) -> Vec<Hash> {
-            self.total_paritions.clone()
         }
 
         ///get list of total partition of each token_holder
@@ -142,7 +134,7 @@ mod erc1400 {
             if self.only_owner() {
                 if self.is_exit_partition(partition) == false {
                     self.controllers.insert((controller, partition), true);
-                    self.total_paritions.push(partition);
+                    self.list_paritions.push(partition);
                     self.is_issuable.insert(partition, true);
                     self.symbol.push(symbol.clone());
                     self.partition_symbol.insert(symbol.clone(), partition);
@@ -172,28 +164,6 @@ mod erc1400 {
                 Ok(())
             }else {
                 Err(Error::NotAllowed)
-            }
-        }
-
-        ///input user that can hold any amount of token in specific partition
-        #[ink(message)]
-        pub fn set_authorized_operator_by_partition(&mut self, authorized: AccountId, partition: Hash) -> Result<(), Error> {
-            if self.is_controller_by_partition(partition){
-                self.authorized_operator.insert((authorized, partition), true);
-                Ok(())
-            }else {
-                return  Err(Error::NotAllowed);
-            }
-        }
-
-        ///remove permission to hold any amount token in specific partition
-        #[ink(message)]
-        pub fn revoke_authorized_operator_by_partitons(&mut self, authorized: AccountId, partition: Hash) -> Result<(), Error> {
-            if self.is_controller_by_partition(partition) {
-                self.authorized_operator.insert((authorized, partition), false);
-                Ok(())
-            }else {
-                return  Err(Error::NotAllowed);
             }
         }
 
@@ -247,7 +217,7 @@ mod erc1400 {
         }
 
         fn is_allowed(&self, token_holder: AccountId, partition: Hash, amount: Balance) -> bool {
-            if self.is_controller_by_partition(partition) || self.is_authorized_operator(partition){
+            if self.is_controller_by_partition(partition) {
                 true
             }else {
                 let alow_balance = self.get_allowed_amout(token_holder, partition);
@@ -265,17 +235,12 @@ mod erc1400 {
         }
 
         fn is_exit_partition(&self, partition: Hash) -> bool {
-            self.total_paritions.contains(&partition)
+            self.list_paritions.contains(&partition)
         }
 
         fn is_controller_by_partition(&self, partition: Hash) -> bool {
             let caller = self.env().caller();
             self.controllers.get(&(caller, partition)).copied().unwrap_or(false)
-        }
-
-        fn is_authorized_operator(&self, partition: Hash) -> bool {
-            let caller = self.env().caller();
-            self.authorized_operator.get(&(caller, partition)).copied().unwrap_or(false)
         }
 
         fn transfer_from_to(&mut self, from: AccountId, to: AccountId, partition: Hash,  amount: Balance) -> Result<(), Error> {
