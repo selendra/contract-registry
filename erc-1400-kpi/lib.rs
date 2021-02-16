@@ -212,7 +212,7 @@ mod erc1400 {
                 self.balance_of_partition.insert((token_holder, partition), balance - amount);
             }
 
-            let balance = self.balance_of_by_partition(token_holder, partition);
+            let balance = self.balance_of_by_partition(caller, partition);
             self.balance_of_partition.insert((caller, partition), balance + amount);
         }
 
