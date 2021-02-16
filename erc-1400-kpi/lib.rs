@@ -221,7 +221,8 @@ mod erc1400 {
                 true
             }else {
                 let alow_balance = self.get_allowed_amout(token_holder, partition);
-                if alow_balance < amount {
+                let balance = self.balance_of_by_partition(token_holder, partition);
+                if alow_balance < amount + balance {
                     false
                 }else {
                     true
@@ -253,6 +254,11 @@ mod erc1400 {
             let to_balannce = self.balance_of_by_partition(to, partition);
             self.balance_of_partition.insert((to, partition), to_balannce + amount);
 
+            let mut own_partition = self.partion_of_token_holder(to);
+            if own_partition.contains(&partition) == false {
+                own_partition.push(partition);
+                self.partitions_of.insert(to, own_partition);
+            };
             Ok(())
         }
 
