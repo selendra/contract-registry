@@ -195,25 +195,21 @@ mod erc1400 {
         pub fn redeem_from(&mut self, token_holder: AccountId, partition: Hash, amount: Balance) -> Result<(), Error> {
             if self.is_controller_by_partition(partition) {
                 let caller = self.env().caller();
-                self.redeem(caller, token_holder, amount, partition);
+
+                let balance = self.balance_of_by_partition(token_holder, partition);
+                if balance < amount {
+                    return Err(Error::InsufficientBalance)
+                }else {
+                    self.balance_of_partition.insert((token_holder, partition), balance - amount);
+                }
+
+                let balance = self.balance_of_by_partition(caller, partition);
+                self.balance_of_partition.insert((caller, partition), balance + amount);
                 Ok(())
+                
             }else {
                 Err(Error::NotAllowed)
             }
-        }
-
-        fn redeem(&mut self, caller: AccountId, token_holder: AccountId, amount: Balance, partition: Hash){
-
-            let balance = self.balance_of_by_partition(token_holder, partition);
-
-            if balance < amount {
-                self.balance_of_partition.insert((token_holder, partition), 0);
-            }else {
-                self.balance_of_partition.insert((token_holder, partition), balance - amount);
-            }
-
-            let balance = self.balance_of_by_partition(caller, partition);
-            self.balance_of_partition.insert((caller, partition), balance + amount);
         }
 
         fn is_allowed(&self, token_holder: AccountId, partition: Hash, amount: Balance) -> bool {
