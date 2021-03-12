@@ -69,6 +69,11 @@ mod attendant_token {
                     return Err(Error::CheckOutFail);
                 };
 
+                let hour = 1000 * 60 * 60;
+                if self.env().block_timestamp() - self.get_checked_time(caller) < hour * 12 {
+                    return Err(Error::CheckInFail);
+                }
+
                 let now = self.env().block_timestamp();
                 let info = Attendant {
                     time: now.clone(),
@@ -87,6 +92,7 @@ mod attendant_token {
                 if self.change_able {
                     self.generate_hash();
                 };
+                
                 Ok(())
             }
         }
@@ -99,7 +105,7 @@ mod attendant_token {
                 let caller = self.env().caller();
 
                 if self.checked_in_status(caller) == false {
-                    return Err(Error::CheckOutFail);
+                    return Err(Error::CheckInFail);
                 };
 
                 let now = self.env().block_timestamp();
